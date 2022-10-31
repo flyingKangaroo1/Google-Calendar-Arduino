@@ -23,9 +23,10 @@ const int calEntryCount = 10;
 
 // Get calendar
 char calendarServer[] = "script.google.com";
+char calendarServer2[] = "script.googleusercontent.com";
 
 // Write the path for your google script to fetch calendar events
-String calendarRequest = "https://script.google.com/macros/s/[고유 코드 입력]/exec";
+String calendarRequest = "https://script.google.com/macros/s/[고유코드]/exec";
 
 // Right now the calendarentries are limited to time and title
 struct calendarEntries
@@ -58,7 +59,7 @@ void loop() {
     WiFiManager wm;    
 
     //reset settings - for testing
-    wm.resetSettings();
+    //wm.resetSettings();
   
     // set configportal timeout
     wm.setConfigPortalTimeout(timeout);
@@ -71,95 +72,97 @@ void loop() {
       delay(5000);
     }
 
+    else {
     //if you get here you have connected to the WiFi
-    Serial.println("connected...yeey :)");
+      Serial.println("connected...yeey :)");
 
-    displayCalendar();
+      displayCalendar();
+    }
   }
   
 }
+
+
+// Buffer size, 128 bytes in this case
+#define RESP_BUFFER_LENGTH 128
+// Pointer to actual buffer
+uint8_t * _buffer = new uint8_t[RESP_BUFFER_LENGTH];
+// String to hold the final response
+String _responseString = "";
+String newURL = "";
+
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+unsigned long period = 5000;
 
 // Main display code - assumes that the display has been initialized
 bool displayCalendar() {
   // Getting calendar from your published google script
   Serial.println(F("Getting calendar"));
-  getRequest(calendarServer, calendarRequest);
+
+  // if connection to calendar does not succeed
+  if ( !(getRequest(calendarServer, calendarRequest)) ) {
+    Serial.println("False1");
+    return false;
+  }
    
-  String outputStr = client.readString();
-  delay(3000);
-  // If redirected - then follow redirect - google always redirect to a temporary URL by default. Note that this at times fail resulting in an empty display. Consider detecting this and retrying.
-  //if (outputStr.indexOf("Location:") > 0) {
-  String newURL = getURL(outputStr);
-  Serial.println("new url: " + newURL);
+  previousMillis = millis();
+  while(client.connected() || ((currentMillis - previousMillis) < period) )
+  {  
+    currentMillis = millis(); 
+    Serial.println("1");
+    Serial.println(currentMillis - previousMillis);
+    while (client.available())
+    {
+      Serial.println("2");
+      // Fill the buffer and make a note of the total read length 
+      int actualLength = client.read(_buffer, RESP_BUFFER_LENGTH);
+      // If it fails for whatever reason
+      if(actualLength <= 0)
+      {
+          // Handle as you see fit
+          Serial.println(".....");
+          //return -1;
+      }
+      // Concatenate the buffer content to the final response string
+      // I used an arduino String for convenience
+      // but you can use strcat or whatever you see fit
+      _responseString += String((char*)_buffer).substring(0, actualLength);
+      Serial.println(_responseString);
 
-  getRequest(calendarServer, newURL);
-
-  outputStr = client.readString();
-  Serial.println("if statement is true"); ///////////////////////////////
-    
-  //}
-
-  Serial.println(outputStr); //////////////////////////////////
-  delay(5000);
-
-  Serial.println("printed string");
-  //const char* host = "script.google.com";
-  //String data = client.getData(newURL, host, "script.googleusercontent.com");
-  //Serial.println(data);
-  
-  /*
-  int indexFrom = 0;
-  int indexTo   = 0;
-  int cutTo     = 0;
-
-  String strBuffer = "";
-
-  int count = 0;
-  int line  = 0;
-
-  indexFrom = outputStr.lastIndexOf("\n") + 1;
-
-  struct calendarEntries calEnt[calEntryCount];
-
-  // Fill calendarEntries with entries from the get-request
-  while (indexTo >= 0 && line < calEntryCount) {
-    count++;
-    indexTo = outputStr.indexOf(";", indexFrom);
-    cutTo = indexTo;
-
-    if (indexTo != -1) {
-      strBuffer = outputStr.substring(indexFrom, cutTo);
-
-      indexFrom = indexTo + 1;
-
-      //Serial.println(strBuffer);
-
-      if (count == 1) {
-        // Set entry time
-        // Exclude end date and time to avoid clutter
-        // Format is "Wed Feb 10 2020 10:00"
-        calEnt[line].calTime = strBuffer.substring(0, 21);
-      } else if (count == 2) {
-        // Set entry title
-        calEnt[line].calTitle = strBuffer;
-      } else {
-        count = 0;
-        line++;
+      if (_responseString.indexOf("HREF=") > 0){
+        newURL = getURL(_responseString);
+        Serial.println("new url: " + newURL);     
       }
     }
   }
 
-  // Print calendar entries from first [0] to the last fetched [line-1] - in case there is fewer events than the maximum allowed
-  for (int i = 0;  i < line; i++) {
-    // Print event time
-    Serial.println(calEnt[i].calTime);
-
-    // Print event title
-    Serial.print(calEnt[i].calTitle);
-  }
-  */
-
+  delete[] _buffer;
+  // Clear buffer memory
   client.stop();
+  
+  Serial.println("before request");
+  
+  if ( !(getRequest(calendarServer2, newURL)) ) {
+    Serial.println("False2");
+    return false;
+  }
+  
+  Serial.println("after request");
+  while(client.connected())
+  { 
+    Serial.println("3");  
+    while (client.available())
+    {
+      Serial.println("4");
+      String outputStr = client.readString();
+      Serial.println(outputStr);
+    }
+  }
+  Serial.println("end of while loop");
+      
+  client.stop();
+  
   return true;
 }
 
@@ -187,6 +190,7 @@ bool getRequest(char *urlServer, String urlRequest) {
     }
   } else {
     Serial.println(F("Calendar connection did not succeed"));
+    return false;
   }
   return true;
 }
@@ -198,6 +202,6 @@ String getURL(String url) {
 
   int indexFrom = url.indexOf(tagStr) + tagStr.length();
   int indexTo   = url.indexOf(endStr, indexFrom);
-
+  
   return url.substring(indexFrom, indexTo);
 }
