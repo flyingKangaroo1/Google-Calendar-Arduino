@@ -86,6 +86,6 @@ function getEvents(cal){
 }
 
 function formatDate(date){
-  var formattedDate = Utilities.formatDate(date, "GMT+1", "HH:mm");
+  var formattedDate = Utilities.formatDate(date, "GMT+9", "HH:mm");
   return formattedDate;
 }
