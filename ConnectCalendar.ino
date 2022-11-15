@@ -22,11 +22,11 @@ int timeout = 80; // seconds to run for
 const int calEntryCount = 10;
 
 // Get calendar
-char calendarServer[] = "script.google.com";
+char calendarServer1[] = "script.google.com";
 char calendarServer2[] = "script.googleusercontent.com";
 
 // Write the path for your google script to fetch calendar events
-String calendarRequest = "https://script.google.com/macros/s/[고유코드 입력]/exec";
+String calendarRequest = "https://script.google.com/macros/s/[고유 ID 입력]/exec";
 
 // Right now the calendarentries are limited to time and title
 struct calendarEntries
@@ -45,6 +45,14 @@ String getURL(String url);
 bool getRequest(char *urlServer, String urlRequest);
 /////////////////////////////////////////////////////////
 
+
+int flag = 1;
+
+/////////////////////////////////////////////////////////
+const char* ssid = "[WiFi 이름 입력]";
+const char* password = "[WiFi 비밀번호 입력]";
+/////////////////////////////////////////////////////////
+
 // setup
 void setup() {
   WiFi.mode(WIFI_STA);
@@ -53,37 +61,42 @@ void setup() {
   pinMode(TRIGGER_PIN, INPUT_PULLUP);
   client.setInsecure();
 
+  WiFi.begin(ssid, password);
+  Serial.println("\nConnecting");
+
+  while(WiFi.status() != WL_CONNECTED){
+    Serial.print(".");
+    delay(100);
+  }
+
+  Serial.println("\nConnected to the WiFi network");
+  Serial.print("Local ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+
 }
 
 // loop
 void loop() {
-  if ( digitalRead(TRIGGER_PIN) == LOW) {
-    WiFiManager wm;    
 
-    //reset settings - for testing
-    //wm.resetSettings();
+  client.setInsecure();
   
-    // set configportal timeout
-    wm.setConfigPortalTimeout(timeout);
+  if ( digitalRead(TRIGGER_PIN) == LOW) {
+    /*
+    // 버튼 눌렀을 때 실행하고 싶은 함수들
+    */
+  }
 
-    if (!wm.startConfigPortal("OnDemandAP")) {
-      Serial.println("failed to connect and hit timeout");
-      delay(3000);
-      //reset and try again, or maybe put it to deep sleep
-      ESP.restart();
-      delay(5000);
-    }
 
-    else {
-    //if you get here you have connected to the WiFi
-      Serial.println("connected...yeey :)");
-
+  if (flag == 1) {
+      //Serial.println("flag is 1");
       if (displayCalendar()) {
         printCalendar();
+        delay(20*1000);
+        Serial.println("end of loop");
       }
-    }
   }
-  
+
+  delay(2*100);
 }
 
 
@@ -105,7 +118,7 @@ bool displayCalendar() {
   Serial.println(F("Getting calendar"));
 
   // if connection to calendar does not succeed
-  if ( !(getRequest(calendarServer, calendarRequest)) ) {
+  if ( !(getRequest(calendarServer1, calendarRequest)) ) {
     Serial.println("False1");
     return false;
   }
@@ -185,9 +198,8 @@ bool displayCalendar() {
       Serial.println(outputStr);
     }
   }
-  Serial.println("end of while loop");
       
-  client.stop();
+  client.stop();///////////////////////////
   
   return true;
 }
